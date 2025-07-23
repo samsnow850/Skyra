@@ -1,60 +1,58 @@
-# Skyra Weather App for Android
+# ☁️ Skyra – Weather, Reimagined
 
-Skyra is a modern, calming weather app designed for clarity and beauty. Powered by OpenWeather, built with ❤️ using React Native & Expo.
+<div align="center">
 
-## Features
-- 5-day weather forecast with beautiful gradients
-- Location-based weather
-- Search for any city’s weather
-- Settings for temperature units (°C/°F)
-- Modern, animated UI
+A modern, calming Android weather app that blends stunning visuals with smooth performance.
 
-## Getting Started (Android)
+![License](https://img.shields.io/github/license/samsnow850/Skyra)
+![Last Commit](https://img.shields.io/github/last-commit/samsnow850/Skyra)
+![Stars](https://img.shields.io/github/stars/samsnow850/Skyra)
+![Forks](https://img.shields.io/github/forks/samsnow850/Skyra)
 
-### 1. Install dependencies
+<br/>
 
-```bash
-npm install
-```
+[![Join Beta on Google Play](https://img.shields.io/badge/Join%20Beta-Google%20Play-34A853?logo=google-play&logoColor=white&style=for-the-badge)](https://play.google.com/apps/internaltest/4701702636014646573)
+&nbsp;
+[![Visit Website](https://img.shields.io/badge/Website-samuelesnow.co-4285F4?style=for-the-badge)](https://samuelesnow.co)
 
-### 2. Start the development server
-
-```bash
-npx expo start
-```
-
-### 3. Run on Android
-
-- **Android Emulator:**
-  - Make sure you have Android Studio and an emulator set up.
-  - In the Expo Dev Tools (browser window that opens), click **"Run on Android device/emulator"**.
-- **Physical Android Device:**
-  - Install the [Expo Go](https://play.google.com/store/apps/details?id=host.exp.exponent) app from Google Play.
-  - Scan the QR code in the Expo Dev Tools with Expo Go.
-
-### 4. Project Structure
-- `app/` — Main app screens and navigation
-- `assets/` — Images, fonts, and splash/logo assets
-- `components/` — Reusable UI components
-- `context/` — Context providers (e.g., unit selection)
-- `constants/` — App-wide constants (e.g., colors)
-- `hooks/` — Custom React hooks
-
-### 5. Customization
-- **Logo:** The app uses `assets/images/skyra-logo.png` as the splash/logo.
-- **API:** Uses OpenWeather API for weather data.
-
-## Notes for Android
-- Make sure to grant location permissions when prompted for accurate weather data.
-- If you encounter issues with the emulator, try restarting it or use a physical device with Expo Go.
-
-## Scripts
-- `npm run reset-project` — Resets the project to a blank state (see `scripts/reset-project.js`).
-
-## Learn More
-- [Expo documentation](https://docs.expo.dev/)
-- [React Native docs](https://reactnative.dev/)
+</div>
 
 ---
 
-Enjoy using Skyra on Android! 🌤️
+![Skyra App Preview](images/skyra-preview.png)
+
+## ✨ Features
+
+- 🌤️ **5-Day Forecast** — Stay informed with a clear forecast view  
+- 📍 **Location-Based Weather** — Instant weather based on your current location  
+- 🔍 **City Search** — Check weather in any city around the world  
+- 🌡️ **Temp Units Toggle** — Switch between °C and °F easily  
+- 🎨 **Beautiful Gradients** — Dynamic UI that changes with the weather  
+- ⚡ **Smooth & Animated UI** — Built for beauty and performance  
+
+---
+
+## 📦 Tech Stack
+
+- [React Native](https://reactnative.dev/) + [Expo](https://expo.dev/)
+- Weather data from [OpenWeather](https://openweathermap.org/)
+- Built with ❤️ by [Samuel Snow](https://samuelesnow.co)
+
+---
+
+## 🚀 Beta Access
+
+Want to help shape Skyra?
+
+👉 [**Join the Beta Test**](https://play.google.com/apps/internaltest/4701702636014646573) on Google Play  
+Your feedback means everything! 💬
+
+---
+
+## 🛠️ Installation (for devs)
+
+```bash
+git clone https://github.com/samsnow850/Skyra.git
+cd Skyra
+npm install
+npx expo start
