@@ -3,15 +3,16 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  FlatList,
-  RefreshControl,
-  SafeAreaView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  View,
+    ActivityIndicator,
+    FlatList,
+    RefreshControl,
+    SafeAreaView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    View,
 } from 'react-native';
+import { useTheme } from '../../context/ThemeContext';
 import { useUnit } from '../../context/UnitContext';
 
 const OPEN_WEATHER_API_KEY = '4862d5e067388e783d46e5265ed1c203';
@@ -47,9 +48,11 @@ function getDateString(dateString: string) {
 export default function ForecastScreen() {
   const { unit } = useUnit();
   const [forecast, setForecast] = useState<any[]>([]);
+  const [city, setCity] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const { theme } = useTheme();
 
   const fetchForecast = async () => {
     setRefreshing(true);
@@ -67,6 +70,7 @@ export default function ForecastScreen() {
         `https://api.openweathermap.org/data/2.5/forecast?lat=${loc.coords.latitude}&lon=${loc.coords.longitude}&units=metric&appid=${OPEN_WEATHER_API_KEY}`
       );
       const data = await response.json();
+      setCity(data.city?.name || '');
       // Group by day, pick the forecast closest to 12:00 each day
       const daily: Record<string, any> = {};
       data.list.forEach((item: any) => {
@@ -93,11 +97,11 @@ export default function ForecastScreen() {
   if (loading) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
-        <StatusBar barStyle="light-content" />
-        <LinearGradient colors={["#232526", "#414345"]} style={styles.gradient}>
+        <StatusBar barStyle={theme.mode === 'dark' ? 'light-content' : 'dark-content'} />
+        <LinearGradient colors={theme.backgroundGradient as any} style={styles.gradient}>
           <View style={styles.loadingContent}>
-            <ActivityIndicator size="large" color="#fff" />
-            <Text style={styles.loadingText}>Loading forecast...</Text>
+            <ActivityIndicator size="large" color={theme.text} />
+            <Text style={[styles.loadingText, { color: theme.text }]}>Loading forecast...</Text>
           </View>
         </LinearGradient>
       </SafeAreaView>
@@ -107,12 +111,12 @@ export default function ForecastScreen() {
   if (errorMsg) {
     return (
       <SafeAreaView style={styles.errorContainer}>
-        <StatusBar barStyle="light-content" />
-        <LinearGradient colors={["#232526", "#414345"]} style={styles.gradient}>
+        <StatusBar barStyle={theme.mode === 'dark' ? 'light-content' : 'dark-content'} />
+        <LinearGradient colors={theme.backgroundGradient as any} style={styles.gradient}>
           <View style={styles.errorContent}>
-            <Ionicons name="warning-outline" size={64} color="#fff" />
-            <Text style={styles.errorTitle}>Oops!</Text>
-            <Text style={styles.errorMessage}>{errorMsg}</Text>
+            <Ionicons name="warning-outline" size={64} color={theme.text} />
+            <Text style={[styles.errorTitle, { color: theme.text }]}>Oops!</Text>
+            <Text style={[styles.errorMessage, { color: theme.text }]}>{errorMsg}</Text>
           </View>
         </LinearGradient>
       </SafeAreaView>
@@ -124,41 +128,42 @@ export default function ForecastScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" />
-      <LinearGradient colors={["#232526", "#414345"]} style={styles.gradient}>
+      <StatusBar barStyle={theme.mode === 'dark' ? 'light-content' : 'dark-content'} />
+      <LinearGradient colors={theme.backgroundGradient as any} style={styles.gradient}>
         <View style={styles.topSpacer} />
-        <Text style={styles.title}>5-Day Forecast</Text>
+        {city ? <Text style={[styles.cityName, { color: theme.text }]}>{city}</Text> : null}
+        <Text style={[styles.title, { color: theme.text }]}>5-Day Forecast</Text>
         <FlatList
           data={forecast}
           keyExtractor={item => item.dt_txt}
           contentContainerStyle={styles.listContent}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={fetchForecast} tintColor="#fff" colors={["#fff"]} />
+            <RefreshControl refreshing={refreshing} onRefresh={fetchForecast} tintColor={theme.text} colors={[theme.text]} />
           }
           renderItem={({ item }) => {
             const day = getDayName(item.dt_txt);
             const dateStr = getDateString(item.dt_txt);
             const icon = weatherIcons[item.weather[0].main] || 'cloud';
             return (
-              <View style={styles.card}>
+              <View style={[styles.card, { backgroundColor: theme.card }]}>
                 <View style={styles.cardHeader}>
-                  <Text style={styles.day}>{day}</Text>
-                  <Text style={styles.date}>{dateStr}</Text>
+                  <Text style={[styles.day, { color: theme.text }]}>{day}</Text>
+                  <Text style={[styles.date, { color: theme.text }]}>{dateStr}</Text>
                 </View>
-                <Ionicons name={icon as any} size={36} color="#fff" style={styles.icon} />
+                <Ionicons name={icon as any} size={36} color={theme.text} style={styles.icon} />
                 <View style={styles.temps}>
-                  <Text style={styles.tempMax}>{displayTempWithUnit(item.main.temp_max)}</Text>
-                  <Text style={styles.tempMin}>{displayTempWithUnit(item.main.temp_min)}</Text>
+                  <Text style={[styles.tempMax, { color: theme.text }]}>{displayTempWithUnit(item.main.temp_max)}</Text>
+                  <Text style={[styles.tempMin, { color: theme.text }]}>{displayTempWithUnit(item.main.temp_min)}</Text>
                 </View>
-                <Text style={styles.desc}>{item.weather[0].description}</Text>
+                <Text style={[styles.desc, { color: theme.text }]}>{item.weather[0].description}</Text>
                 <View style={styles.cardDetailsRow}>
                   <View style={styles.cardDetail}>
-                    <Ionicons name="water" size={18} color="#7FDBFF" style={styles.detailIcon} />
-                    <Text style={styles.detailText}>{item.main.humidity}%</Text>
+                    <Ionicons name="water" size={18} color={theme.accent} style={styles.detailIcon} />
+                    <Text style={[styles.detailText, { color: theme.text }]}>{item.main.humidity}%</Text>
                   </View>
                   <View style={styles.cardDetail}>
-                    <Ionicons name="cloud-outline" size={18} color="#B0E0E6" style={styles.detailIcon} />
-                    <Text style={styles.detailText}>{Math.round(item.wind.speed)} m/s</Text>
+                    <Ionicons name="cloud-outline" size={18} color={theme.accent} style={styles.detailIcon} />
+                    <Text style={[styles.detailText, { color: theme.text }]}>{Math.round(item.wind.speed)} m/s</Text>
                   </View>
                 </View>
               </View>
@@ -223,6 +228,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 24,
     letterSpacing: 1,
+  },
+  cityName: {
+    color: '#fff',
+    fontSize: 22,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 4,
   },
   listContent: {
     paddingHorizontal: 16,

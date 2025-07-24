@@ -21,6 +21,8 @@ const MAPPING = {
   'cloud.sun.fill': 'wb-cloudy',
   'magnifyingglass': 'search',
   'gearshape.fill': 'settings',
+  'heart.fill': 'favorite',
+  'star': 'star',
 } as IconMapping;
 
 /**
