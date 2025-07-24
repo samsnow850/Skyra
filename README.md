@@ -45,14 +45,4 @@ A modern, calming Android weather app that blends stunning visuals with smooth p
 Want to help shape Skyra?
 
 👉 [**Join the Beta Test**](https://play.google.com/apps/internaltest/4701702636014646573) on Google Play  
-Your feedback means everything! 💬
-
----
-
-## 🛠️ Installation (for devs)
-
-```bash
-git clone https://github.com/samsnow850/Skyra.git
-cd Skyra
-npm install
-npx expo start
+Your feedback means everything!
