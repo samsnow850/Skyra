@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Appearance, ColorSchemeName } from 'react-native';
+import { supabase } from '../utils/supabase';
 
 const LIGHT = {
   mode: 'light',
@@ -31,15 +32,73 @@ const ThemeContext = createContext({
 export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
   const [themeName, setThemeName] = useState<'light' | 'dark' | 'system'>('system');
   const [theme, setTheme] = useState(LIGHT);
+  const [user, setUser] = useState<any>(null);
 
+  // Check if user is logged in
   useEffect(() => {
-    (async () => {
-      const stored = await AsyncStorage.getItem('theme');
-      if (stored === 'light' || stored === 'dark' || stored === 'system') {
-        setThemeName(stored);
-      }
-    })();
+    const checkUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+    };
+    checkUser();
   }, []);
+
+  // Load theme preference from Supabase or AsyncStorage
+  useEffect(() => {
+    const loadThemePreference = async () => {
+      if (user) {
+        // Load from Supabase if user is logged in
+        try {
+          const { data, error } = await supabase
+            .from('user_preferences')
+            .select('theme')
+            .eq('id', user.id)
+            .single();
+          
+          if (data && data.theme && (data.theme === 'light' || data.theme === 'dark' || data.theme === 'system')) {
+            setThemeName(data.theme);
+          }
+        } catch (error) {
+          console.log('Error loading theme from Supabase:', error);
+          // Fallback to AsyncStorage
+          const stored = await AsyncStorage.getItem('theme');
+          if (stored === 'light' || stored === 'dark' || stored === 'system') {
+            setThemeName(stored);
+          }
+        }
+      } else {
+        // Load from AsyncStorage if not logged in
+        const stored = await AsyncStorage.getItem('theme');
+        if (stored === 'light' || stored === 'dark' || stored === 'system') {
+          setThemeName(stored);
+        }
+      }
+    };
+
+    loadThemePreference();
+  }, [user]);
+
+  // Save theme preference to Supabase or AsyncStorage
+  const saveThemePreference = async (newThemeName: 'light' | 'dark' | 'system') => {
+    if (user) {
+      // Save to Supabase if user is logged in
+      try {
+        await supabase
+          .from('user_preferences')
+          .upsert({
+            id: user.id,
+            theme: newThemeName
+          });
+      } catch (error) {
+        console.log('Error saving theme to Supabase:', error);
+        // Fallback to AsyncStorage
+        await AsyncStorage.setItem('theme', newThemeName);
+      }
+    } else {
+      // Save to AsyncStorage if not logged in
+      await AsyncStorage.setItem('theme', newThemeName);
+    }
+  };
 
   useEffect(() => {
     const getScheme = () => {
@@ -50,8 +109,8 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
       return themeName === 'dark' ? DARK : LIGHT;
     };
     setTheme(getScheme());
-    AsyncStorage.setItem('theme', themeName);
-  }, [themeName]);
+    saveThemePreference(themeName);
+  }, [themeName, user]);
 
   useEffect(() => {
     if (themeName === 'system') {

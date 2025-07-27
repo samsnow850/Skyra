@@ -22,9 +22,23 @@ export default function TabLayout() {
           ios: {
             // Use a transparent background on iOS to show the blur effect
             position: 'absolute',
-            backgroundColor: theme.card,
+            backgroundColor: theme.mode === 'light' ? '#ffffff' : theme.card,
+            borderTopWidth: 0,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: -2 },
+            shadowOpacity: 0.1,
+            shadowRadius: 4,
+            elevation: 8,
           },
-          default: { backgroundColor: theme.card },
+          default: { 
+            backgroundColor: theme.mode === 'light' ? '#ffffff' : theme.card,
+            borderTopWidth: 0,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: -2 },
+            shadowOpacity: 0.1,
+            shadowRadius: 4,
+            elevation: 8,
+          },
         }),
       }}>
       <Tabs.Screen

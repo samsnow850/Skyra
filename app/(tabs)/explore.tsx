@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
+import LottieView from 'lottie-react-native';
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
@@ -14,6 +15,7 @@ import {
 } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { useUnit } from '../../context/UnitContext';
+import { formatWindSpeed } from '../../utils/windSpeed';
 
 const OPEN_WEATHER_API_KEY = '4862d5e067388e783d46e5265ed1c203';
 
@@ -46,7 +48,7 @@ function getDateString(dateString: string) {
 }
 
 export default function ForecastScreen() {
-  const { unit } = useUnit();
+  const { unit, windUnit } = useUnit();
   const [forecast, setForecast] = useState<any[]>([]);
   const [city, setCity] = useState<string>('');
   const [loading, setLoading] = useState(true);
@@ -57,13 +59,16 @@ export default function ForecastScreen() {
   const fetchForecast = async () => {
     setRefreshing(true);
     setLoading(true);
-    let { status } = await Location.requestForegroundPermissionsAsync();
+    
+    // Check if location permission is already granted
+    let { status } = await Location.getForegroundPermissionsAsync();
     if (status !== 'granted') {
-      setErrorMsg('Permission to access location was denied');
+      setErrorMsg('Location access needed for forecast data. Please enable location in settings or complete onboarding.');
       setRefreshing(false);
       setLoading(false);
       return;
     }
+    
     let loc = await Location.getCurrentPositionAsync({});
     try {
       const response = await fetch(
@@ -100,7 +105,12 @@ export default function ForecastScreen() {
         <StatusBar barStyle={theme.mode === 'dark' ? 'light-content' : 'dark-content'} />
         <LinearGradient colors={theme.backgroundGradient as any} style={styles.gradient}>
           <View style={styles.loadingContent}>
-            <ActivityIndicator size="large" color={theme.text} />
+            <LottieView
+              source={require('../../assets/images/weather-storm-loading.json')}
+              autoPlay
+              loop
+              style={{ width: 120, height: 120 }}
+            />
             <Text style={[styles.loadingText, { color: theme.text }]}>Loading forecast...</Text>
           </View>
         </LinearGradient>
@@ -163,7 +173,7 @@ export default function ForecastScreen() {
                   </View>
                   <View style={styles.cardDetail}>
                     <Ionicons name="cloud-outline" size={18} color={theme.accent} style={styles.detailIcon} />
-                    <Text style={[styles.detailText, { color: theme.text }]}>{Math.round(item.wind.speed)} m/s</Text>
+                    <Text style={[styles.detailText, { color: theme.text }]}>{formatWindSpeed(item.wind.speed, windUnit)}</Text>
                   </View>
                 </View>
               </View>

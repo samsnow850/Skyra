@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
+import LottieView from 'lottie-react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -19,17 +20,108 @@ import {
 } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { useUnit } from '../../context/UnitContext';
+import { formatWindSpeed } from '../../utils/windSpeed';
+import { supabase } from '../../utils/supabase';
 
 const OPEN_WEATHER_API_KEY = '4862d5e067388e783d46e5265ed1c203';
 const FAVORITES_KEY = 'FAVORITE_LOCATIONS';
 
 function CityWeatherDetails({ city, onClose }: { city: any; onClose: () => void }) {
   const { theme } = useTheme();
-  const { unit } = useUnit();
+  const { unit, windUnit } = useUnit();
   const [weather, setWeather] = useState<any>(null);
   const [hourly, setHourly] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [favorites, setFavorites] = useState<string[]>([]);
+  const [user, setUser] = useState<any>(null);
+
+  // Check if user is logged in
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+    };
+    checkUser();
+  }, []);
+
+  useEffect(() => {
+    loadFavorites();
+  }, [user]);
+
+  const loadFavorites = async () => {
+    if (user) {
+      // Load from Supabase if user is logged in
+      try {
+        const { data, error } = await supabase
+          .from('user_favorites')
+          .select('city_name')
+          .eq('user_id', user.id);
+        
+        if (data) {
+          const cityNames = data.map(fav => fav.city_name);
+          setFavorites(cityNames);
+        }
+      } catch (error) {
+        console.log('Error loading favorites from Supabase:', error);
+        // Fallback to AsyncStorage
+        const data = await AsyncStorage.getItem(FAVORITES_KEY);
+        if (data) setFavorites(JSON.parse(data));
+      }
+    } else {
+      // Load from AsyncStorage if not logged in
+      const data = await AsyncStorage.getItem(FAVORITES_KEY);
+      if (data) setFavorites(JSON.parse(data));
+    }
+  };
+
+  const saveFavorites = async (newFavorites: string[]) => {
+    setFavorites(newFavorites);
+    
+    if (user) {
+      // Save to Supabase if user is logged in
+      try {
+        // First, delete all existing favorites for this user
+        await supabase
+          .from('user_favorites')
+          .delete()
+          .eq('user_id', user.id);
+        
+        // Then insert all new favorites
+        if (newFavorites.length > 0) {
+          const favoritesToInsert = newFavorites.map(cityName => ({
+            user_id: user.id,
+            city_name: cityName
+          }));
+          
+          await supabase
+            .from('user_favorites')
+            .insert(favoritesToInsert);
+        }
+      } catch (error) {
+        console.log('Error saving favorites to Supabase:', error);
+        // Fallback to AsyncStorage
+        await AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify(newFavorites));
+      }
+    } else {
+      // Save to AsyncStorage if not logged in
+      await AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify(newFavorites));
+    }
+    
+    DeviceEventEmitter.emit('favoritesUpdated');
+  };
+
+  const isFavorite = (cityName: string) => favorites.includes(cityName);
+
+  const toggleFavorite = async (cityName: string) => {
+    if (isFavorite(cityName)) {
+      const newFavorites = favorites.filter(fav => fav !== cityName);
+      await saveFavorites(newFavorites);
+    } else {
+      const newFavorites = [...favorites, cityName];
+      await saveFavorites(newFavorites);
+    }
+  };
 
   useEffect(() => {
     const fetchWeather = async () => {
@@ -76,89 +168,135 @@ function CityWeatherDetails({ city, onClose }: { city: any; onClose: () => void 
   const currentWeatherCondition = (weather?.weather?.[0]?.main || 'Clear') as keyof typeof weatherThemes;
   const weatherTheme = weatherThemes[currentWeatherCondition] || weatherThemes.Clear;
 
-  if (loading) return <ActivityIndicator size="large" color={theme.text} style={{ marginTop: 32 }} />;
-  if (error) return <Text style={{ color: theme.error, textAlign: 'center', marginTop: 16 }}>{error}</Text>;
+  if (loading) return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.backgroundGradient[0] }}>
+      <LinearGradient colors={theme.backgroundGradient as any} style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <LottieView
+          source={require('../../assets/images/weather-storm-loading.json')}
+          autoPlay
+          loop
+          style={{ width: 100, height: 100 }}
+        />
+        <Text style={{ color: theme.text, marginTop: 16, fontSize: 16 }}>Loading weather...</Text>
+      </LinearGradient>
+    </SafeAreaView>
+  );
+  
+  if (error) return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.backgroundGradient[0] }}>
+      <LinearGradient colors={theme.backgroundGradient as any} style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <Text style={{ color: theme.error, textAlign: 'center', marginTop: 16 }}>{error}</Text>
+      </LinearGradient>
+    </SafeAreaView>
+  );
+  
   if (!weather) return null;
 
   return (
-    <ScrollView style={{ marginTop: 24, marginBottom: 32 }} contentContainerStyle={{ paddingBottom: 32 }}>
-      <View style={[styles.weatherCard, { backgroundColor: theme.card, position: 'relative' }]}> 
-        <TouchableOpacity onPress={onClose} style={{ position: 'absolute', top: 10, right: 10, zIndex: 2 }}>
-          <Ionicons name="close-circle" size={28} color={theme.error} />
-        </TouchableOpacity>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Text style={[styles.cityName, { color: theme.text }]}>{weather.name}</Text>
-        </View>
-        <Ionicons name={weatherTheme.icon as any} size={60} color={theme.text} style={{ marginBottom: 8 }} />
-        <Text style={[styles.temp, { color: theme.text }]}>{displayTempWithUnit(weather.main.temp)}</Text>
-        <Text style={[styles.desc, { color: theme.text }]}>{weather.weather[0].description}</Text>
-        <Text style={[styles.feelsLike, { color: theme.text }]}>Feels like {displayTempWithUnit(weather.main.feels_like)}</Text>
-        <Text style={[styles.highLow, { color: theme.text }]}>H:{displayTempWithUnit(weather.main.temp_max)}  L:{displayTempWithUnit(weather.main.temp_min)}</Text>
-      </View>
-      {/* Hourly Forecast */}
-      <View style={{ marginTop: 16 }}>
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>Hourly Forecast</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.hourlyScroll}>
-          {hourly.map((hour, index) => (
-            <View key={index} style={[styles.hourlyCard, { backgroundColor: theme.card }]}> 
-              <Text style={[styles.hourlyTime, { color: theme.text }]}>{new Date(hour.dt * 1000).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</Text>
-              <Ionicons name={hour.weather[0].main === 'Clear' ? 'sunny' : hour.weather[0].main === 'Rain' ? 'rainy' : 'cloudy'} size={24} color={theme.text} style={styles.hourlyIcon} />
-              <Text style={[styles.hourlyTemp, { color: theme.text }]}>{displayTemp(hour.main.temp)}°</Text>
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.backgroundGradient[0] }}>
+      <LinearGradient colors={theme.backgroundGradient as any} style={{ flex: 1 }}>
+        <ScrollView style={{ flex: 1, paddingHorizontal: 24 }} contentContainerStyle={{ paddingBottom: 32 }}>
+          <View style={[styles.weatherCard, { backgroundColor: theme.card, position: 'relative' }]}> 
+            <TouchableOpacity onPress={onClose} style={{ position: 'absolute', top: 10, right: 10, zIndex: 2 }}>
+              <Ionicons name="close-circle" size={28} color={theme.error} />
+            </TouchableOpacity>
+            
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <Text style={[styles.cityName, { color: theme.text }]}>{weather.name}</Text>
+              <TouchableOpacity 
+                onPress={() => toggleFavorite(weather.name)}
+                style={{ 
+                  backgroundColor: isFavorite(weather.name) ? theme.accent : 'transparent',
+                  borderWidth: 1,
+                  borderColor: theme.accent,
+                  borderRadius: 20,
+                  paddingHorizontal: 12,
+                  paddingVertical: 6
+                }}
+              >
+                <Ionicons 
+                  name={isFavorite(weather.name) ? "heart" : "heart-outline"} 
+                  size={20} 
+                  color={isFavorite(weather.name) ? theme.card : theme.accent} 
+                />
+              </TouchableOpacity>
             </View>
-          ))}
+            
+            <Ionicons name={weatherTheme.icon as any} size={60} color={theme.text} style={{ marginBottom: 8 }} />
+            <Text style={[styles.temp, { color: theme.text }]}>{displayTempWithUnit(weather.main.temp)}</Text>
+            <Text style={[styles.desc, { color: theme.text }]}>{weather.weather[0].description}</Text>
+            <Text style={[styles.feelsLike, { color: theme.text }]}>Feels like {displayTempWithUnit(weather.main.feels_like)}</Text>
+            <Text style={[styles.highLow, { color: theme.text }]}>H:{displayTempWithUnit(weather.main.temp_max)}  L:{displayTempWithUnit(weather.main.temp_min)}</Text>
+          </View>
+          
+          {/* Hourly Forecast */}
+          <View style={{ marginTop: 16 }}>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Hourly Forecast</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.hourlyScroll}>
+              {hourly.map((hour, index) => (
+                <View key={index} style={[styles.hourlyCard, { backgroundColor: theme.card }]}> 
+                  <Text style={[styles.hourlyTime, { color: theme.text }]}>{new Date(hour.dt * 1000).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</Text>
+                  <Ionicons name={hour.weather[0].main === 'Clear' ? 'sunny' : hour.weather[0].main === 'Rain' ? 'rainy' : 'cloudy'} size={24} color={theme.text} style={styles.hourlyIcon} />
+                  <Text style={[styles.hourlyTemp, { color: theme.text }]}>{displayTemp(hour.main.temp)}°</Text>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+          
+          {/* Weather Details */}
+          <View style={{ marginTop: 16 }}>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Weather Details</Text>
+            <View style={styles.detailsGrid}>
+              <View style={[styles.modernWeatherCard, { borderLeftColor: theme.accent, backgroundColor: theme.card }]}> 
+                <View style={styles.cardHeader}>
+                  <Ionicons name="water" size={20} color={theme.accent} />
+                  <Text style={[styles.cardTitle, { color: theme.text }]}>Humidity</Text>
+                </View>
+                <Text style={[styles.cardValue, { color: theme.text }]}>{weather.main.humidity}%</Text>
+              </View>
+              <View style={[styles.modernWeatherCard, { borderLeftColor: theme.accent, backgroundColor: theme.card }]}> 
+                <View style={styles.cardHeader}>
+                  <Ionicons name="leaf" size={20} color={theme.accent} />
+                  <Text style={[styles.cardTitle, { color: theme.text }]}>Wind Speed</Text>
+                </View>
+                <Text style={[styles.cardValue, { color: theme.text }]}>{formatWindSpeed(weather.wind.speed, windUnit)}</Text>
+              </View>
+              <View style={[styles.modernWeatherCard, { borderLeftColor: theme.accent, backgroundColor: theme.card }]}> 
+                <View style={styles.cardHeader}>
+                  <Ionicons name="speedometer" size={20} color={theme.accent} />
+                  <Text style={[styles.cardTitle, { color: theme.text }]}>Pressure</Text>
+                </View>
+                <Text style={[styles.cardValue, { color: theme.text }]}>{weather.main.pressure} hPa</Text>
+              </View>
+              <View style={[styles.modernWeatherCard, { borderLeftColor: theme.accent, backgroundColor: theme.card }]}> 
+                <View style={styles.cardHeader}>
+                  <Ionicons name="eye" size={20} color={theme.accent} />
+                  <Text style={[styles.cardTitle, { color: theme.text }]}>Visibility</Text>
+                </View>
+                <Text style={[styles.cardValue, { color: theme.text }]}>{weather.visibility ? (weather.visibility / 1000).toFixed(1) : '10'} km</Text>
+              </View>
+            </View>
+          </View>
+          
+          {/* Sun & Moon */}
+          <View style={{ marginTop: 16 }}>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Sun & Moon</Text>
+            <View style={styles.sunTimesContainer}>
+              <View style={[styles.sunTimeCard, { backgroundColor: theme.card }]}> 
+                <Ionicons name="sunny" size={24} color="#FFA726" />
+                <Text style={[styles.sunTimeLabel, { color: theme.text }]}>Sunrise</Text>
+                <Text style={[styles.sunTimeValue, { color: theme.text }]}>{formatTime(weather.sys.sunrise)}</Text>
+              </View>
+              <View style={[styles.sunTimeCard, { backgroundColor: theme.card }]}> 
+                <Ionicons name="moon" size={24} color="#AB47BC" />
+                <Text style={[styles.sunTimeLabel, { color: theme.text }]}>Sunset</Text>
+                <Text style={[styles.sunTimeValue, { color: theme.text }]}>{formatTime(weather.sys.sunset)}</Text>
+              </View>
+            </View>
+          </View>
         </ScrollView>
-      </View>
-      {/* Weather Details */}
-      <View style={{ marginTop: 16 }}>
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>Weather Details</Text>
-        <View style={styles.detailsGrid}>
-          <View style={[styles.modernWeatherCard, { borderLeftColor: theme.accent, backgroundColor: theme.card }]}> 
-            <View style={styles.cardHeader}>
-              <Ionicons name="water" size={20} color={theme.accent} />
-              <Text style={[styles.cardTitle, { color: theme.text }]}>Humidity</Text>
-            </View>
-            <Text style={[styles.cardValue, { color: theme.text }]}>{weather.main.humidity}%</Text>
-          </View>
-          <View style={[styles.modernWeatherCard, { borderLeftColor: theme.accent, backgroundColor: theme.card }]}> 
-            <View style={styles.cardHeader}>
-              <Ionicons name="leaf" size={20} color={theme.accent} />
-              <Text style={[styles.cardTitle, { color: theme.text }]}>Wind Speed</Text>
-            </View>
-            <Text style={[styles.cardValue, { color: theme.text }]}>{weather.wind.speed} m/s</Text>
-          </View>
-          <View style={[styles.modernWeatherCard, { borderLeftColor: theme.accent, backgroundColor: theme.card }]}> 
-            <View style={styles.cardHeader}>
-              <Ionicons name="speedometer" size={20} color={theme.accent} />
-              <Text style={[styles.cardTitle, { color: theme.text }]}>Pressure</Text>
-            </View>
-            <Text style={[styles.cardValue, { color: theme.text }]}>{weather.main.pressure} hPa</Text>
-          </View>
-          <View style={[styles.modernWeatherCard, { borderLeftColor: theme.accent, backgroundColor: theme.card }]}> 
-            <View style={styles.cardHeader}>
-              <Ionicons name="eye" size={20} color={theme.accent} />
-              <Text style={[styles.cardTitle, { color: theme.text }]}>Visibility</Text>
-            </View>
-            <Text style={[styles.cardValue, { color: theme.text }]}>{weather.visibility ? (weather.visibility / 1000).toFixed(1) : '10'} km</Text>
-          </View>
-        </View>
-      </View>
-      {/* Sun & Moon */}
-      <View style={{ marginTop: 16 }}>
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>Sun & Moon</Text>
-        <View style={styles.sunTimesContainer}>
-          <View style={[styles.sunTimeCard, { backgroundColor: theme.card }]}> 
-            <Ionicons name="sunny" size={24} color="#FFA726" />
-            <Text style={[styles.sunTimeLabel, { color: theme.text }]}>Sunrise</Text>
-            <Text style={[styles.sunTimeValue, { color: theme.text }]}>{formatTime(weather.sys.sunrise)}</Text>
-          </View>
-          <View style={[styles.sunTimeCard, { backgroundColor: theme.card }]}> 
-            <Ionicons name="moon" size={24} color="#AB47BC" />
-            <Text style={[styles.sunTimeLabel, { color: theme.text }]}>Sunset</Text>
-            <Text style={[styles.sunTimeValue, { color: theme.text }]}>{formatTime(weather.sys.sunset)}</Text>
-          </View>
-        </View>
-      </View>
-    </ScrollView>
+      </LinearGradient>
+    </SafeAreaView>
   );
 }
 
@@ -169,24 +307,85 @@ export default function SearchScreen() {
   const [errorMsg, setErrorMsg] = useState('');
   const { unit } = useUnit();
   const [favorites, setFavorites] = useState<string[]>([]);
+  const [user, setUser] = useState<any>(null);
   const { theme } = useTheme();
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const debounceTimeout = useRef<any>(null);
   const [selectedCity, setSelectedCity] = useState<any>(null);
 
+  // Check if user is logged in
   useEffect(() => {
-    loadFavorites();
+    const checkUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+    };
+    checkUser();
   }, []);
 
+  useEffect(() => {
+    loadFavorites();
+  }, [user]);
+
   const loadFavorites = async () => {
-    const data = await AsyncStorage.getItem(FAVORITES_KEY);
-    if (data) setFavorites(JSON.parse(data));
+    if (user) {
+      // Load from Supabase if user is logged in
+      try {
+        const { data, error } = await supabase
+          .from('user_favorites')
+          .select('city_name')
+          .eq('user_id', user.id);
+        
+        if (data) {
+          const cityNames = data.map(fav => fav.city_name);
+          setFavorites(cityNames);
+        }
+      } catch (error) {
+        console.log('Error loading favorites from Supabase:', error);
+        // Fallback to AsyncStorage
+        const data = await AsyncStorage.getItem(FAVORITES_KEY);
+        if (data) setFavorites(JSON.parse(data));
+      }
+    } else {
+      // Load from AsyncStorage if not logged in
+      const data = await AsyncStorage.getItem(FAVORITES_KEY);
+      if (data) setFavorites(JSON.parse(data));
+    }
   };
 
   const saveFavorites = async (newFavorites: string[]) => {
     setFavorites(newFavorites);
-    await AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify(newFavorites));
+    
+    if (user) {
+      // Save to Supabase if user is logged in
+      try {
+        // First, delete all existing favorites for this user
+        await supabase
+          .from('user_favorites')
+          .delete()
+          .eq('user_id', user.id);
+        
+        // Then insert all new favorites
+        if (newFavorites.length > 0) {
+          const favoritesToInsert = newFavorites.map(cityName => ({
+            user_id: user.id,
+            city_name: cityName
+          }));
+          
+          await supabase
+            .from('user_favorites')
+            .insert(favoritesToInsert);
+        }
+      } catch (error) {
+        console.log('Error saving favorites to Supabase:', error);
+        // Fallback to AsyncStorage
+        await AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify(newFavorites));
+      }
+    } else {
+      // Save to AsyncStorage if not logged in
+      await AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify(newFavorites));
+    }
+    
     DeviceEventEmitter.emit('favoritesUpdated'); // Notify other tabs
   };
 
@@ -315,7 +514,17 @@ export default function SearchScreen() {
             <CityWeatherDetails city={selectedCity} onClose={() => setSelectedCity(null)} />
           )}
         </Modal>
-        {loading && <ActivityIndicator size="large" color={theme.text} style={{ marginTop: 32 }} />}
+        {loading && (
+          <View style={{ alignItems: 'center', marginTop: 32 }}>
+            <LottieView
+              source={require('../../assets/images/weather-storm-loading.json')}
+              autoPlay
+              loop
+              style={{ width: 100, height: 100 }}
+            />
+            <Text style={[styles.loadingText, { color: theme.text, marginTop: 16 }]}>Searching weather...</Text>
+          </View>
+        )}
         {errorMsg ? <Text style={[styles.errorMsg, { color: theme.error }]}>{errorMsg}</Text> : null}
       </LinearGradient>
     </SafeAreaView>
@@ -478,6 +687,10 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   sunTimeValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  loadingText: {
     fontSize: 18,
     fontWeight: 'bold',
   },

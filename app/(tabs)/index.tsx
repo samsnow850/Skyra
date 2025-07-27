@@ -2,13 +2,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
+import LottieView from 'lottie-react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
   Dimensions,
   RefreshControl,
-  SafeAreaView,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -16,8 +16,11 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../context/ThemeContext';
 import { useUnit } from '../../context/UnitContext';
+import { formatWindSpeed } from '../../utils/windSpeed';
+import { supabase } from '../../utils/supabase';
 
 const { width, height } = Dimensions.get('window');
 
@@ -145,11 +148,40 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const { unit, setUnit } = useUnit();
+  const [user, setUser] = useState<any>(null);
+  const [userName, setUserName] = useState<string>('');
+  const { unit, setUnit, windUnit } = useUnit();
   const { theme } = useTheme();
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
+
+  // Get greeting based on time of day
+  const getGreeting = () => {
+    const hour = currentTime.getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
+  };
+
+  // Get user data and name
+  useEffect(() => {
+    const getUserData = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          setUser(user);
+          // Get name from user metadata or email
+          const name = user.user_metadata?.name || user.email?.split('@')[0] || '';
+          setUserName(name);
+        }
+      } catch (error) {
+        console.log('Error fetching user data:', error);
+      }
+    };
+
+    getUserData();
+  }, []);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -210,7 +242,16 @@ export default function HomeScreen() {
   useEffect(() => {
     const initializeApp = async () => {
       setLoading(true);
-      await requestLocation();
+      
+      // Check if location permission is already granted
+      const { status } = await Location.getForegroundPermissionsAsync();
+      if (status === 'granted') {
+        await requestLocation();
+      } else {
+        // Don't request location automatically - let onboarding handle it
+        setErrorMsg('Location access needed for weather data. Please enable location in settings or complete onboarding.');
+      }
+      
       setLoading(false);
 
       Animated.parallel([
@@ -256,7 +297,12 @@ export default function HomeScreen() {
         <LinearGradient colors={theme.backgroundGradient as any} style={styles.gradient}>
           <View style={styles.loadingContent}>
             <View style={styles.loadingIconContainer}>
-              <ActivityIndicator size="large" color={theme.text} />
+              <LottieView
+                source={require('../../assets/images/weather-storm-loading.json')}
+                autoPlay
+                loop
+                style={{ width: 120, height: 120 }}
+              />
             </View>
             <Text style={[styles.loadingText, { color: theme.text }]}>Getting your weather...</Text>
             <Text style={[styles.loadingSubtext, { color: theme.text }]}>Please wait while we fetch the latest data</Text>
@@ -278,7 +324,7 @@ export default function HomeScreen() {
             <Text style={[styles.errorTitle, { color: theme.text }]}>Oops!</Text>
             <Text style={[styles.errorMessage, { color: theme.text }]}>{errorMsg}</Text>
             <TouchableOpacity style={[styles.retryButton, { borderColor: theme.border }]} onPress={requestLocation}>
-              <Text style={[styles.retryButtonText, { color: theme.text }]}>Try Again</Text>
+              <Text style={[styles.retryButtonText, { color: theme.text }]}>Enable Location</Text>
             </TouchableOpacity>
           </View>
         </LinearGradient>
@@ -313,6 +359,16 @@ export default function HomeScreen() {
           >
             {/* Extra top spacing */}
             <View style={{ height: 48 }} />
+            
+            {/* Personalized Greeting */}
+            {user && userName && (
+              <View style={styles.greetingContainer}>
+                <Text style={[styles.greetingText, { color: theme.text }]} numberOfLines={1} ellipsizeMode="tail">
+                  {getGreeting()}, {userName}
+                </Text>
+              </View>
+            )}
+            
             {/* Modern Header */}
             <View style={styles.modernHeader}>
               <View style={styles.locationSection}>
@@ -401,7 +457,7 @@ export default function HomeScreen() {
                 />
                 <ModernWeatherCard
                   title="Wind Speed"
-                  value={`${weather?.wind.speed || 0} m/s`}
+                  value={formatWindSpeed(weather?.wind.speed || 0, windUnit)}
                   icon="leaf"
                   accentColor={theme.accent}
                   cardColor={theme.card}
@@ -581,7 +637,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.08)',
     borderRadius: 30,
     padding: 30,
-    backdropFilter: 'blur(10px)',
   },
   temperatureSection: {
     flexDirection: 'row',
@@ -719,5 +774,15 @@ const styles = StyleSheet.create({
   },
   bottomPadding: {
     height: 40,
+  },
+  greetingContainer: {
+    paddingHorizontal: 24,
+    marginBottom: 8,
+  },
+  greetingText: {
+    fontSize: 24,
+    fontWeight: '700',
+    textAlign: 'left',
+    letterSpacing: 0.5,
   },
 });

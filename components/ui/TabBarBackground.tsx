@@ -4,7 +4,7 @@ import { useTheme } from '../../context/ThemeContext';
 
 export default function TabBarBackground() {
   const { theme } = useTheme();
-  return <View style={[StyleSheet.absoluteFill, { backgroundColor: theme.card }]} />;
+  return <View style={[StyleSheet.absoluteFill, { backgroundColor: theme.mode === 'light' ? '#ffffff' : theme.card }]} />;
 }
 
 export function useBottomTabOverflow() {
